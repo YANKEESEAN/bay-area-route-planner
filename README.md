@@ -48,7 +48,6 @@ The project uses Flask as the backend service and AMap API for route visualizati
 
 ## Project Structure
 
-```text
 bay-area-route-planner/
 │
 ├── templates/
@@ -142,7 +141,6 @@ The project forms a complete workflow from attraction selection to route plannin
 
 MIT License
 
-````
 
 ---
 
@@ -202,7 +200,6 @@ MIT License
 
 ## 项目结构
 
-```text
 Smart-GBA-Trip-Planner/
 │
 ├── templates/

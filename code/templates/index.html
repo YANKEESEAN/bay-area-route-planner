@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粤港澳大湾区旅游路径规划系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入高德地图API -->
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=b496d51ec22e60384e87c2eb6f8d11ea"></script>
+    <!-- 引入UI组件库用于绘制路线 -->
+    <script type="text/javascript" src="https://webapi.amap.com/ui/1.1/main.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        danger: '#EF4444',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .bg-gradient-primary {
+                background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            }
+            .bg-gradient-secondary {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            }
+            .bg-gradient-danger {
+                background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-7xl mx-auto bg-white shadow-2xl rounded-xl overflow-hidden my-6 md:my-10">
+        <!-- 头部 -->
+        <header class="bg-gradient-primary text-white p-6 md:p-8">
+            <div class="text-center">
+                <h1 class="text-3xl md:text-4xl font-bold mb-3 flex items-center justify-center">
+                    <i class="fa fa-map-marker mr-3"></i>粤港澳大湾区旅游路径规划系统
+                </h1>
+                <p class="text-lg md:text-xl opacity-90">包含香港、澳门及珠三角主要城市的智能旅游路线规划</p>
+            </div>
+        </header>
+
+        <!-- 主要内容区 -->
+        <div class="flex flex-col md:flex-row">
+            <!-- 左侧选择面板 -->
+            <div class="w-full md:w-1/3 bg-gray-50 border-r border-gray-200">
+                <div class="p-5">
+                    <h2 class="text-xl font-bold text-dark mb-4 flex items-center">
+                        <i class="fa fa-map-signs mr-2 text-primary"></i>选择景点
+                    </h2>
+
+                    <div class="bg-white rounded-lg p-3 mb-5 text-center">
+                        <p class="font-medium text-gray-700">
+                            已选择: <span id="selectedCount" class="text-primary font-bold">0</span>
+                            / <span id="totalAttractions" class="text-gray-600">0</span> 个景点
+                        </p>
+                    </div>
+
+                    <!-- 景点搜索筛选 -->
+                    <div class="mb-4">
+                        <input type="text" id="attractionFilter"
+                            class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="搜索景点...">
+                    </div>
+
+                    <!-- 城市标签切换 -->
+                    <div class="mb-5 overflow-x-auto scrollbar-hide pb-2">
+                        <div class="flex space-x-2 min-w-max" id="cityTabs">
+                            <!-- 城市标签将通过JavaScript动态生成 -->
+                        </div>
+                    </div>
+
+                    <!-- 景点网格 -->
+                    <div class="bg-white rounded-lg border border-gray-200 max-h-[400px] overflow-y-auto p-3 mb-6">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="attractionsGrid">
+                            <!-- 景点按钮将通过JavaScript动态生成 -->
+                        </div>
+                    </div>
+
+                    <!-- 控制按钮 -->
+                    <div class="space-y-3">
+                        <select id="algorithmSelect" class="w-full px-4 py-3 rounded-lg border-2 border-primary bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            <option value="greedy"><i class="fa fa-bolt mr-1"></i> 贪婪算法 (快速规划)</option>
+                            <option value="aco"><i class="fa fa-bug mr-1"></i> ACO算法 (最优路径)</option>
+                            <option value="dp"><i class="fa fa-sitemap mr-1"></i> 动态规划算法 (精确规划)</option>
+                            <option value="genetic"><i class="fa fa-random mr-1"></i> 遗传算法 (全局优化)</option>
+                        </select>
+
+                        <button id="calculateBtn" disabled class="w-full py-3 px-4 bg-gradient-secondary text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-secondary/50">
+                            <i class="fa fa-rocket mr-2"></i>开始路径规划
+                        </button>
+
+                        <button id="resetBtn" class="w-full py-3 px-4 bg-gradient-danger text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-danger/50">
+                            <i class="fa fa-refresh mr-2"></i>重新选择
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧结果面板 -->
+            <div class="w-full md:w-2/3 p-5">
+                <h2 class="text-xl font-bold text-dark mb-4 flex items-center">
+                    <i class="fa fa-bar-chart mr-2 text-primary"></i>规划结果
+                </h2>
+
+                <!-- 状态提示 -->
+                <div id="loading" class="hidden mb-5 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+                        <p>正在智能规划最佳路径，请稍候...</p>
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="hidden mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"></div>
+                <div id="successMessage" class="hidden mb-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"></div>
+
+                <!-- 路径显示 -->
+                <div class="bg-gray-50 rounded-lg border border-gray-200 p-5 mb-6 min-h-[150px]">
+                    <div id="pathDisplay" class="flex flex-wrap items-center justify-center">
+                        <p class="text-gray-500 italic">请选择景点并点击"开始路径规划"</p>
+                    </div>
+                </div>
+
+                <!-- 结果统计 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-lg p-4 shadow-lg">
+                        <h3 class="text-sm font-medium opacity-90 mb-2">总距离</h3>
+                        <div class="text-2xl font-bold" id="totalDistance">--</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-teal-600 text-white rounded-lg p-4 shadow-lg">
+                        <h3 class="text-sm font-medium opacity-90 mb-2">总时间</h3>
+                        <div class="text-2xl font-bold" id="totalTime">--</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-lg p-4 shadow-lg">
+                        <h3 class="text-sm font-medium opacity-90 mb-2">访问景点</h3>
+                        <div class="text-2xl font-bold" id="placesCount">--</div>
+                    </div>
+                </div>
+
+                <!-- 路径保存与分享功能 -->
+                <div class="mt-4 flex gap-2">
+                    <button id="savePathBtn" class="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90">
+                        <i class="fa fa-save mr-1"></i>保存路径
+                    </button>
+                    <button id="sharePathBtn" class="px-4 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent/90">
+                        <i class="fa fa-share-alt mr-1"></i>分享路径
+                    </button>
+                </div>
+
+                <!-- 地图显示区域 -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold text-dark mb-3">
+                        <i class="fa fa-map mr-2 text-primary"></i>路径地图
+                    </h3>
+                    <div id="mapContainer" class="w-full h-[400px] rounded-lg border border-gray-200"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 景点详情弹窗 -->
+    <div id="attractionModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div class="p-4 border-b">
+                <h3 id="modalTitle" class="text-xl font-bold"></h3>
+                <button id="closeModal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div id="modalContent" class="p-4">
+                <!-- 景点详情内容 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 粤港澳大湾区城市及景点
+        const cityAttractions = {
+            "全部": [],
+            "广州": [
+                "上下九步行街", "光孝寺", "华南国家植物园", "南海神庙",
+                "南越王博物院（王墓展区）", "宝墨园", "广东省博物馆",
+                "广州圣心大教堂", "广州塔", "广州大学城", "广州市白云山风景区",
+                "广州市长隆旅游度假区", "永庆坊", "沙湾古镇", "沙面",
+                "海心沙亚运公园", "花城广场", "莲花山旅游区", "越秀公园",
+                "陈家祠", "黄埔古港", "火炉山森林公园", "珠江夜游码头", "中山纪念堂", "余荫山房", "大夫山森林公园", "大佛古寺"
+            ],
+            "深圳": [
+                "世界之窗", "东部华侨城", "大梅沙海滨公园", 
+                "深圳市华侨城旅游度假区", "深圳市观澜湖休闲旅游区",
+                "深圳平安金融中心云际观光层", "深圳欢乐谷", "深圳湾公园",
+                "锦绣中华民俗村", "杨梅坑", "较场尾", "西涌沙滩"
+            ],
+            "珠海": [
+                "东澳岛", "外伶仃岛", "桂山岛", "港珠澳大桥", "珠海太空中心",
+                "珠海情侣路", "珠海规划馆", "珠海长隆海洋王国", "景山公园", "金沙滩"
+            ],
+            "佛山": [
+                "佛山市西樵山景区", "佛山市长鹿旅游休博园", "佛山文创古镇",
+                "佛山祖庙", "清晖园", "烟桥村", "世纪莲体育中心", "河口百年火车站", "平沙岛", "江根村"
+            ],
+            "东莞": [
+                "东莞可园", "东莞市沉香文化博物馆", "华阳湖国家湿地公园",
+                "同沙生态公园", "牙香街文化旅游区", "粤晖园", "佛灵湖生态旅游区"
+            ],
+            "中山": [
+                "中山孙中山故居", "中山孙中山故里旅游区", "中山市博物馆",
+                "中山树木园", "五桂山逍遥谷",
+                "客家婆景区", "广东中山翠亨国家湿地公园", "孙文西路步行街",
+                "旗溪生态村", "雍陌村", "香山商业文化博物馆",
+                "金钟湖公园"
+            ],
+            "惠州": [
+                "惠州体育馆", "惠州市惠州西湖旅游景区", "惠州市罗浮山景区", "惠州植物园"
+            ],
+            "江门": [
+                "上川岛飞沙滩", "台山水步镇草坪里", "圭峰山国家森林公园",
+                "川山群岛海丝遗址", "广东新会小鸟天堂国家湿地公园",
+                "江门市东湖公园", "江门市开平碉楼文化旅游区", "江门船厂",
+                "赤坎华侨古镇", "郑观应故居","那琴半岛地质海洋公园", "城央绿廊", "长廊生态园"
+            ],
+            "肇庆": [
+                "肇庆市体育中心", "肇庆市星湖旅游景区"
+            ],
+            "香港": [
+                "兰桂坊", "嗇色园黄大仙祠", "大澳", "天星码头", "太平山顶",
+                "昂坪360", "星光大道", "维多利亚港", "金紫荆广场",
+                "香港太空馆", "香港摩天轮", "香港故宫文化博物馆", "香港海洋公园",
+                "香港迪士尼乐园"
+            ],
+            "澳门": [
+                "澳门大三巴牌坊", "澳门威尼斯人度假区", "澳门巴黎人度假区",
+                "澳门旅游塔", "澳门海事博物馆", "澳门渔人码头", "路环村及黑沙海滩", "影汇之星8字形摩天轮", "新濠影汇水上乐园"
+            ]
+        };
+
+        // 景点详情数据
+        const attractionDetails = {
+            "广州塔": "广州塔又称小蛮腰，是广州的地标性建筑，高600米，拥有观光平台、摩天轮等设施，可俯瞰广州全景。",
+            "广州市长隆旅游度假区": "集野生动物世界、水上乐园、欢乐世界等多个主题公园于一体的大型旅游度假区。",
+            "广州市白云山风景区": "广州“市肺”，属南粤名山，拥有摩星岭、明珠楼等景区，可登山揽胜、休闲吸氧。",
+            "花城广场": "广州城市客厅，周边环绕广州塔、广东省博物馆等地标，是观赏城市天际线与举办大型活动的核心区。",
+            "海心沙亚运公园": "2010年广州亚运会开幕式举办地，坐拥珠江畔美景，是市民散步、观赏灯光秀的热门地点。",
+            "广东省博物馆": "省级综合性博物馆，馆藏文物超17万件，设历史、艺术、自然主题展厅，展现广东文化底蕴。",
+            "珠江夜游码头": "主要分布天字码头、大沙头码头等，乘游船可欣赏珠江两岸灯光璀璨的建筑与夜景。",
+            "沙面": "曾为英法租界，保留大量欧式古建筑，有“广州外滩”之称，现是咖啡馆、文创店聚集的文艺打卡地。",
+            "上下九步行街": "广州传统商业步行街，汇集老字号商铺、岭南特色小吃，充满西关民俗风情。",
+            "陈家祠": "又称陈氏书院，是岭南古建筑艺术集大成者，以精美的砖雕、木雕、石雕等装饰闻名。",
+            "南越王博物院（王墓展区）": "以西汉南越王赵眜陵墓为核心，出土“文帝行玺”金印等珍贵文物，展现南越国历史文化。",
+            "大佛古寺": "广州历史悠久的佛教寺院，重建后建筑宏伟，夜间灯光璀璨，是城市中心的静心之地。",
+            "永庆坊": "基于西关骑楼改造的文创街区，保留岭南建筑特色，聚集潮流店铺、非遗工作室，兼具复古与时尚。",
+            "越秀公园": "广州历史最悠久的公园，内有镇海楼、五羊石像等标志性景观，是市民休闲、晨练的好去处。",
+            "中山纪念堂": "为纪念孙中山先生而建，采用中式宫殿式建筑风格，内部空间宽敞，是举办重要活动与参观的场所。",
+            "华南国家植物园": "中国面积最大的南亚热带植物园，拥有珍稀植物数千种，是科普教育与生态观光的理想地。",
+            "火炉山森林公园": "广州近郊登山胜地，山体植被茂密，登顶可俯瞰广州东部城区，适合徒步健身。",
+            "广州圣心大教堂": "中国现存最大的石结构哥特式教堂，始建于19世纪，以宏伟的建筑与彩色玻璃闻名。",
+            "莲花山旅游区": "以古采石场遗址、莲花塔、望海观音像为核心，兼具自然景观与宗教文化氛围。",
+            "宝墨园": "集岭南园林、清官文化、岭南书画于一体的园林景区，园内锦鲤池、紫洞舫等景观极具特色。",
+            "大夫山森林公园": "广州南部大型森林公园，拥有大片湖泊与森林，可骑行、划船、野餐，适合家庭休闲。",
+            "余荫山房": "广东四大名园之一，以“小巧玲珑”著称，园林布局精巧，亭台楼阁错落有致，尽显岭南园林韵味。",
+            "沙湾古镇": "拥有800多年历史的岭南古镇，保留大量明清建筑，以姜撞奶等传统美食与飘色民俗闻名。",
+            "广州大学城": "聚集中山大学、华南理工大学等多所高校，校园建筑现代，周边有岭南印象园等配套景点。",
+            "南海神庙": "中国古代海上丝绸之路的重要遗址，始建于隋代，是祭祀海神的场所，保留众多古碑刻。",
+            "黄埔古港": "明清时期广州对外贸易的重要港口，如今保留古码头、粤海第一关纪念馆等，展现古港历史风貌。",
+            "光孝寺": "广州最古老的佛教寺院，始建于西汉，寺内有瘗发塔、六祖殿等，是禅宗文化的重要遗址。",
+            "深圳市华侨城旅游度假区": "包含世界之窗、锦绣中华等多个著名景点，是深圳最具代表性的旅游区域之一。",
+            "深圳市观澜湖休闲旅游区": "以高尔夫运动为核心，配套温泉、购物村、亲子乐园，是综合性休闲度假目的地。",
+            "世界之窗": "集全球著名景点微缩景观于一体，可“一日游遍世界”，夜间还有大型歌舞表演。",
+            "深圳湾公园": "沿深圳湾海岸线修建的滨海公园，连接福田与南山，是观赏海景、骑行、观鸟的热门地点。",
+            "深圳平安金融中心云际观光层": "位于平安金融中心116层，高度547米，可360度俯瞰深圳城市全景。",
+            "锦绣中华民俗村": "分为“锦绣中华”微缩景观区与“民俗村”文化体验区，展现中国各地自然风光与民俗风情。",
+            "大梅沙海滨公园": "深圳著名海滨浴场，拥有广阔沙滩与清澈海水，是市民夏日戏水、度假的好去处。",
+            "西涌沙滩": "位于深圳东部，是深圳最长的天然沙滩，海水洁净，适合露营、冲浪、观赏海上日出。",
+            "东部华侨城": "集山地度假、生态观光、主题乐园于一体，包含茶溪谷、大侠谷等景区，环境清幽。",
+            "杨梅坑": "背靠七娘山，面临大亚湾，海岸线曲折，是徒步、骑行与拍摄海景的热门地点，因《美人鱼》取景闻名。",
+            "较场尾": "深圳“小鼓浪屿”，沿海分布大量彩色民宿，适合短途度假、海边烧烤、体验渔村风情。",
+            "深圳欢乐谷": "大型主题乐园，拥有过山车、摩天轮等游乐设施，分多个主题区，适合不同年龄段游客。",
+            "珠海长隆海洋王国": "全球最大的海洋主题公园之一，拥有众多珍稀海洋生物和精彩表演。",
+            "珠海情侣路": "沿珠海海岸线修建的景观公路，全长28公里，可欣赏香炉湾、野狸岛等海景，是散步、骑行的好去处。",
+            "景山公园": "位于珠海市区，登山可俯瞰珠海全景与港珠澳大桥，园内还有索道、滑道等游乐设施。",
+            "外伶仃岛": "珠海著名海岛，海水湛蓝，岛上有伶仃峰、石景公园等景点，适合海岛度假、海钓。",
+            "珠海太空中心": "以航天科技为主题的科普场馆，设有模拟发射、太空舱体验等项目，适合亲子参观。",
+            "金沙滩": "珠海西部海滨浴场，沙滩宽阔，配套完善，可进行沙滩排球、水上摩托等活动。",
+            "珠海规划馆": "展示珠海城市规划与发展历程的场馆，建筑设计现代，内部展览互动性强。",
+            "港珠澳大桥": "连接香港、珠海、澳门的超级工程，可通过观光巴士或乘船欣赏大桥宏伟景观。",
+            "东澳岛": "拥有南沙湾“钻石沙滩”，岛上保留铳城等历史遗迹，是生态与历史结合的海岛景区。",
+            "桂山岛": "珠海东部海岛，曾是万山战役发生地，现有桂山舰纪念公园，兼具红色旅游与海岛风光。",
+            "香港迪士尼乐园": "全球第五座迪士尼乐园，拥有七大主题园区，是亲子游的热门目的地。",
+            "香港海洋公园": "集海洋生物观赏与游乐设施于一体，拥有登山缆车、海洋剧场等，可俯瞰香港南区海景。",
+            "太平山顶": "香港最高点，乘坐山顶缆车登顶，可俯瞰维多利亚港与香港市区全景，是观赏夜景的最佳地点。",
+            "维多利亚港": "香港标志性海域，两岸高楼林立，“幻彩咏香江”灯光秀是每日必看的景观。",
+            "星光大道": "沿维多利亚港修建，地面镶嵌香港电影明星手印与签名，展现香港电影发展史。",
+            "香港太空馆": "以天文与太空科学为主题的场馆，拥有球幕影院，适合科普教育与亲子体验。",
+            "香港故宫文化博物馆": "展示故宫文物与香港本地文化的场馆，建筑设计融合传统与现代，馆藏丰富。",
+            "昂坪360": "连接东涌与昂坪的缆车线路，可高空俯瞰大屿山风光，终点站靠近天坛大佛。",
+            "大澳": "香港现存的渔村，保留棚屋建筑，可乘船游览水道，体验传统渔村生活。",
+            "嗇色园黄大仙祠": "香港著名道教庙宇，供奉黄大仙，香火旺盛，是市民祈福的热门场所。",
+            "香港摩天轮": "位于中环海滨，高60米，乘坐一圈约15分钟，可欣赏维多利亚港与城市天际线。",
+            "天星码头": "历史悠久的渡轮码头，乘坐天星小轮横渡维多利亚港，是体验香港风情的经典方式。",
+            "兰桂坊": "位于中环的酒吧街，聚集大量中西餐厅、酒吧，是香港夜生活与潮流文化的代表地。",
+            "金紫荆广场": "位于湾仔，矗立“永远盛开的紫荆花”雕塑，是香港回归的标志性纪念场所。",
+            "澳门大三巴牌坊": "澳门标志性建筑，原为圣保禄大教堂遗址，融合了欧洲文艺复兴与东方建筑的风格。",
+            "澳门旅游塔": "高338米，拥有观光层、蹦极跳、空中漫步等项目，是澳门高空体验与观赏全景的地点。",
+            "澳门威尼斯人度假区": "大型综合度假村，内部建有人工运河，可乘坐贡多拉船，配套赌场、酒店、购物中心。",
+            "澳门巴黎人度假区": "以法国巴黎为主题的度假村，仿制埃菲尔铁塔（高162米），充满欧式浪漫风情。",
+            "影汇之星8字形摩天轮": "位于新濠影汇度假村，摩天轮轨道呈“8”字形，是全球独特的高空游乐设施。",
+            "澳门渔人码头": "仿欧美渔人码头风格建造，集餐饮、购物、娱乐于一体，是拍摄与休闲的热门地点。",
+            "新濠影汇水上乐园": "包含多个水上滑道、造浪池等设施，适合家庭亲子夏日游玩。",
+            "路环村及黑沙海滩": "路环村保留葡式建筑与乡村风情，黑沙海滩因黑色沙滩闻名，适合休闲度假。",
+            "澳门海事博物馆": "展示澳门海事历史与航海文化的场馆，建筑形似船舰，内部展览生动有趣。",
+            "佛山市西樵山景区": "岭南四大名山之一，以火山地貌、南海观音像为核心，兼具自然景观与宗教文化。",
+            "佛山市长鹿旅游休博园": "集主题乐园、动物园、温泉、农家乐于一体，适合家庭亲子休闲度假。",
+            "佛山祖庙": "佛山标志性文化建筑，供奉北帝，内有黄飞鸿纪念馆、叶问堂，展现佛山武术文化。",
+            "河口百年火车站": "始建于1903年，是广三铁路的重要站点，保留百年前的站房与铁轨，充满复古风情。",
+            "江根村": "位于佛山三水，是“中国长寿之乡”的代表村落，保留传统民居，生态环境优美。",
+            "佛山文创古镇": "以佛山陶瓷文化为核心，聚集陶瓷文创店、美术馆，可体验陶瓷制作工艺。",
+            "平沙岛": "位于西江之上的江心岛，以田园风光、沙滩休闲为特色，适合露营、骑行、采摘。",
+            "烟桥村": "拥有600多年历史的古村落，保留明清建筑，村巷布局如“烟”字，充满岭南水乡韵味。",
+            "世纪莲体育中心": "佛山标志性体育场馆，建筑形似莲花，可举办大型赛事与演唱会，周边配套公园。",
+            "清晖园": "广东四大名园之一，位于佛山顺德，园林布局精巧，融合江南与岭南园林风格，景色雅致。",
+            "东莞可园": "广东四大名园之一，以“小巧玲珑、设计精巧”著称，园内亭台楼阁、山水相映，尽显岭南园林特色。",
+            "东莞市沉香文化博物馆": "展示东莞沉香文化与历史的场馆，馆藏珍贵沉香展品，可了解沉香制作工艺。",
+            "牙香街文化旅游区": "以东莞沉香文化为主题的街区，保留明清骑楼，聚集沉香商铺、非遗工作室。",
+            "佛灵湖生态旅游区": "东莞近郊生态景区，拥有湖泊、森林，可进行徒步、骑行、烧烤，环境清幽。",
+            "同沙生态公园": "环绕同沙水库修建，植被茂密，是东莞市民休闲、骑行、观赏湖景的热门地点。",
+            "华阳湖国家湿地公园": "以华阳湖为核心，打造“水上森林”景观，可乘船游览，周边配套花海、绿道。",
+            "粤晖园": "东莞大型岭南园林，园内有30多个景点，亭台楼阁、曲桥流水，展现岭南园林的恢弘与精致。",
+            "中山孙中山故里旅游区": "以孙中山先生相关景点为核心，包含孙中山故居、中山影视城等，是红色旅游与文化体验地。",
+            "中山孙中山故居": "孙中山先生出生与早年生活的场所，保留故居建筑与文物，展现先生的成长历程。",
+            "中山市博物馆": "综合性博物馆，馆藏文物超万件，设有历史、民俗等展厅，展现中山历史文化。",
+            "孙文西路步行街": "中山传统商业步行街，保留骑楼建筑，聚集老字号商铺与潮流店铺，充满复古风情。",
+            "香山商业文化博物馆": "展示中山（香山）商业文化发展史的场馆，通过实物与互动展览，呈现香山商帮历史。",
+            "金钟湖公园": "中山市区大型生态公园，围绕金钟湖修建，有环湖绿道、花海，适合散步、骑行。",
+            "五桂山逍遥谷": "位于五桂山山脉，以自然山水、森林景观为特色，可登山、溯溪、体验农家乐。",
+            "旗溪生态村": "以生态农业与乡村旅游为核心，村内有茶园、花海，适合短途度假、亲近自然。",
+            "广东中山翠亨国家湿地公园": "位于翠亨新区，拥有湿地、滩涂，是观鸟、欣赏湿地生态的理想地。",
+            "中山树木园": "收集培育华南地区植物的园区，分多个植物主题区，是科普教育与休闲观光的场所。",
+            "雍陌村": "孙中山先生早年生活过的村落，保留传统民居与历史遗迹，充满岭南乡村风情。",
+            "郑观应故居": "清代启蒙思想家郑观应的故居，保留原有建筑风貌，展示郑观应的生平与思想。",
+            "江门市开平碉楼文化旅游区": "包含立园、自力村碉楼群等，碉楼融合中西建筑风格，是世界文化遗产，展现侨乡历史。",
+            "长廊生态园": "江门大型生态园区，有花海、萌宠乐园、拓展基地，适合家庭亲子游玩与休闲。",
+            "城央绿廊": "沿江门河修建的生态景观带，有绿道、花海、亲水平台，是市民散步、观赏江景的好去处。",
+            "江门船厂": "由旧船厂改造的文创园区，保留工业遗迹，聚集咖啡馆、艺术展厅，充满工业风与文艺气息。",
+            "台山水步镇草坪里": "网红侨乡村落，房屋外墙绘有彩色壁画，配套民宿、农家乐，适合拍照打卡。",
+            "赤坎华侨古镇": "拥有百年历史的侨乡古镇，保留骑楼建筑群，重建后成为集文化、旅游、商业于一体的景区。",
+            "广东新会小鸟天堂国家湿地公园": "因巴金《鸟的天堂》闻名，拥有大片榕树林，是鸟类栖息的乐园，可乘船观赏。",
+            "圭峰山国家森林公园": "江门著名山体景区，主峰海拔545米，登山可俯瞰新会城区，山间有玉台寺等景点。",
+            "江门市东湖公园": "江门市区老牌公园，围绕东湖修建，有亭台楼阁、湖心岛，是市民休闲、晨练的场所。",
+            "上川岛飞沙滩": "位于台山上川岛，拥有长4800米的沙滩，海水清澈，是海岛度假、戏水的热门地点。",
+            "川山群岛海丝遗址": "分布在川山群岛，包含古码头、古村落等，是海上丝绸之路的重要遗迹，展现侨乡海洋文化。",
+            "那琴半岛地质海洋公园": "位于台山那琴半岛，拥有独特的海蚀地貌与清澈海水，是徒步、观海、拍摄的胜地。",
+            "惠州市惠州西湖旅游景区": "与杭州西湖齐名，拥有“五湖六桥十八景”，湖水清澈，周边古迹众多，是休闲观光的好去处。",
+            "惠州市罗浮山景区": "中国十大道教名山之一，号称“岭南第一山”，有冲虚古观、飞云顶等景点，兼具自然与宗教文化。",
+            "惠州体育馆": "惠州标志性体育场馆，建筑设计现代，可举办大型赛事与演唱会，周边配套体育公园。",
+            "惠州植物园": "惠州综合性植物园，收集培育华南地区植物，分多个主题园区，是科普与休闲的理想地。",
+            "客家婆景区": "以客家文化与传统美食为核心，可参观客家米酒、豆腐花制作工艺，体验客家民俗。",
+            "肇庆市星湖旅游景区": "包含七星岩、鼎湖山两大核心景区，七星岩以喀斯特地貌与湖泊闻名，鼎湖山是“北回归线上的绿洲”。",
+            "肇庆市体育中心": "肇庆大型体育场馆，拥有体育场、体育馆等设施，可举办赛事与活动，周边是市民休闲的场所"
+        };
+
+        // 填充"全部"类别
+        Object.keys(cityAttractions).forEach(city => {
+            if (city !== "全部") {
+                cityAttractions["全部"] = [...cityAttractions["全部"], ...cityAttractions[city]];
+            }
+        });
+
+        const attractionCoordinates = {
+            "广州塔": { lng: 113.324890, lat: 23.105818 },
+            "广州市长隆旅游度假区": { lng: 113.392502, lat: 22.926343 },
+            "广州市白云山风景区": { lng: 113.288764, lat: 23.154684 },
+            "花城广场": { lng: 113.324593, lat: 23.120498 },
+            "海心沙亚运公园": { lng: 113.324063, lat: 23.111378 },
+            "广东省博物馆": { lng: 113.326909, lat: 23.114687 },
+            "珠江夜游码头": { lng: 113.288149, lat: 23.112552 },
+            "沙面": { lng: 113.245343, lat: 23.107934 },
+            "上下九步行街": { lng: 113.246205, lat: 23.113636 },
+            "陈家祠": { lng: 113.245403, lat: 23.126680 },
+            "南越王博物院（王墓展区）": { lng: 113.261319, lat: 23.138452 },
+            "大佛古寺": { lng: 113.265427, lat: 23.120612 },
+            "永庆坊": { lng: 113.238286, lat: 23.114231 },
+            "越秀公园": { lng: 113.264905, lat: 23.139843 },
+            "中山纪念堂": { lng: 113.264682, lat: 23.133454 },
+            "华南国家植物园": { lng: 113.366548, lat: 23.183036 },
+            "火炉山森林公园": { lng: 113.385117, lat: 23.168708 },
+            "广州圣心大教堂": { lng: 113.259681, lat: 23.113231 },
+            "莲花山旅游区": { lng: 113.504534, lat: 22.978790 },
+            "宝墨园": { lng: 113.295821, lat: 22.895776 },
+            "大夫山森林公园": { lng: 113.312360, lat: 22.940635 },
+            "余荫山房": { lng: 113.396284, lat: 23.011053 },
+            "沙湾古镇": { lng: 113.339011, lat: 22.911356 },
+            "广州大学城": { lng: 113.390206, lat: 23.048903 },
+            "南海神庙": { lng: 113.499625, lat: 23.082382 },
+            "黄埔古港": { lng: 113.392277, lat: 23.086754 },
+            "光孝寺": { lng: 113.256566, lat: 23.128849 },
+            "深圳市华侨城旅游度假区": { lng: 113.979821, lat: 22.538544 },
+            "深圳市观澜湖休闲旅游区": { lng: 114.081805, lat: 22.723768 },
+            "世界之窗": { lng: 113.973715, lat: 22.534481 },
+            "深圳湾公园": { lng: 113.950183, lat: 22.519126 },
+            "深圳平安金融中心云际观光层": { lng: 114.055727, lat: 22.533100 },
+            "锦绣中华民俗村": { lng: 113.997275, lat: 22.531446 },
+            "大梅沙海滨公园": { lng: 114.304446, lat: 22.594822 },
+            "西涌沙滩": { lng: 114.516427, lat: 22.536057 },
+            "东部华侨城": { lng: 114.304446, lat: 22.594822 },
+            "杨梅坑": { lng: 114.485808, lat: 22.548877 },
+            "较场尾": { lng: 114.501620, lat: 22.595512 },
+            "深圳欢乐谷": { lng: 113.978730, lat: 22.538869 },
+            "珠海长隆海洋王国": { lng: 113.537108, lat: 22.097771 },
+            "珠海情侣路": { lng: 113.578416, lat: 22.286425 },
+            "景山公园": { lng: 113.576348, lat: 22.251964 },
+            "外伶仃岛": { lng: 114.030358, lat: 22.101621 },
+            "珠海太空中心": { lng: 113.335681, lat: 22.101894 },
+            "金沙滩": { lng: 113.363400, lat: 22.054270 },
+            "珠海规划馆": { lng: 113.581490, lat: 22.270549 },
+            "港珠澳大桥": { lng: 113.590424, lat: 22.210443 },
+            "东澳岛": { lng: 113.713464, lat: 22.025282 },
+            "桂山岛": { lng: 113.823731, lat: 22.135239 },
+            "香港迪士尼乐园": { lng: 114.045338, lat: 22.309132 },
+            "香港海洋公园": { lng: 114.172369, lat: 22.242430 },
+            "太平山顶": { lng: 114.154373, lat: 22.281981 },
+            "维多利亚港": { lng: 114.192847, lat: 22.312510 },
+            "星光大道": { lng: 114.192847, lat: 22.312510 },
+            "香港太空馆": { lng: 114.176107, lat: 22.291170 },
+            "香港故宫文化博物馆": { lng: 114.192847, lat: 22.312510 },
+            "昂坪360": { lng: 113.911161, lat: 22.257921 },
+            "大澳": { lng: 113.867516, lat: 22.250595 },
+            "嗇色园黄大仙祠": { lng: 114.203886, lat: 22.336321 },
+            "香港摩天轮": { lng: 114.162542, lat: 22.285418 },
+            "天星码头": { lng: 114.192847, lat: 22.312510 },
+            "兰桂坊": { lng: 114.160463, lat: 22.278511 },
+            "金紫荆广场": { lng: 114.178013, lat: 22.280418 },
+            "澳门大三巴牌坊": { lng: 113.545851, lat: 22.193610 },
+            "澳门旅游塔": { lng: 113.553647, lat: 22.188539 },
+            "澳门威尼斯人度假区": { lng: 113.551129, lat: 22.185340 },
+            "澳门巴黎人度假区": { lng: 113.551129, lat: 22.185340 },
+            "影汇之星8字形摩天轮": { lng: 113.566255, lat: 22.138475 },
+            "澳门渔人码头": { lng: 113.557653, lat: 22.189267 },
+            "新濠影汇水上乐园": { lng: 113.566255, lat: 22.138475 },
+            "路环村及黑沙海滩": { lng: 113.575091, lat: 22.116143 },
+            "澳门海事博物馆": { lng: 113.546894, lat: 22.190970 },
+            "佛山市西樵山景区": { lng: 112.987172, lat: 22.938068 },
+            "佛山市长鹿旅游休博园": { lng: 113.153480, lat: 22.886554 },
+            "佛山祖庙": { lng: 113.113207, lat: 23.029314 },
+            "河口百年火车站": { lng: 112.896948, lat: 23.166268 },
+            "江根村": { lng: 112.896948, lat: 23.166268 },
+            "佛山文创古镇": { lng: 112.836668, lat: 23.063746 },
+            "平沙岛": { lng: 112.892573, lat: 22.900047 },
+            "烟桥村": { lng: 113.010807, lat: 22.863346 },
+            "世纪莲体育中心": { lng: 113.133098, lat: 22.968664 },
+            "清晖园": { lng: 113.255061, lat: 22.835627 },
+            "东莞可园": { lng: 113.743697, lat: 23.041652 },
+            "东莞市沉香文化博物馆": { lng: 113.871647, lat: 22.983709 },
+            "牙香街文化旅游区": { lng: 113.887252, lat: 22.992661 },
+            "佛灵湖生态旅游区": { lng: 113.845271, lat: 22.970233 },
+            "同沙生态公园": { lng: 113.801480, lat: 22.967287 },
+            "华阳湖国家湿地公园": { lng: 113.567679, lat: 23.064005 },
+            "粤晖园": { lng: 113.631622, lat: 22.973432 },
+            "中山孙中山故里旅游区": { lng: 113.536734, lat: 22.444672 },
+            "中山孙中山故居": { lng: 113.536734, lat: 22.444672 },
+            "中山市博物馆": { lng: 113.374740, lat: 22.520321 },
+            "孙文西路步行街": { lng: 113.369379, lat: 22.521375 },
+            "香山商业文化博物馆": { lng: 113.369379, lat: 22.521375 },
+            "金钟湖公园": { lng: 113.384378, lat: 22.475648 },
+            "五桂山逍遥谷": { lng: 113.433991, lat: 22.429522 },
+            "旗溪生态村": { lng: 113.459573, lat: 22.397781 },
+            "广东中山翠亨国家湿地公园": { lng: 113.536734, lat: 22.444672 },
+            "中山树木园": { lng: 113.395819, lat: 22.513947 },
+            "雍陌村": { lng: 113.462869, lat: 22.365043 },
+            "郑观应故居": { lng: 113.462869, lat: 22.365043 },
+            "江门市开平碉楼文化旅游区": { lng: 112.625360, lat: 22.369390 },
+            "长廊生态园": { lng: 113.114086, lat: 22.547517 },
+            "城央绿廊": { lng: 113.111029, lat: 22.561301 },
+            "江门船厂": { lng: 112.309610, lat: 22.178619 },
+            "台山水步镇草坪里": { lng: 112.791726, lat: 22.350833 },
+            "赤坎华侨古镇": { lng: 112.582516, lat: 22.334980 },
+            "广东新会小鸟天堂国家湿地公园": { lng: 113.043561, lat: 22.514804 },
+            "圭峰山国家森林公园": { lng: 113.037259, lat: 22.548772 },
+            "江门市东湖公园": { lng: 112.718078, lat: 22.369048 },
+            "上川岛飞沙滩": { lng: 112.798188, lat: 21.725750 },
+            "川山群岛海丝遗址": { lng: 112.663444, lat: 21.691055 },
+            "那琴半岛地质海洋公园": { lng: 112.350505, lat: 21.719684 },
+            "惠州市惠州西湖旅游景区": { lng: 114.401274, lat: 23.090101 },
+            "惠州市罗浮山景区": { lng: 114.040677, lat: 23.206759 },
+            "惠州体育馆": { lng: 114.415037, lat: 23.109078 },
+            "惠州植物园": { lng: 114.374899, lat: 23.097231 },
+            "客家婆景区": { lng: 114.147847, lat: 23.241005 },
+            "肇庆市星湖旅游景区": { lng: 112.488292, lat: 23.070035 },
+            "肇庆市体育中心": { lng: 112.450006, lat: 23.063312 }
+        };
+
+        let selectedAttractions = new Set();
+        let currentCity = "全部";
+
+        // 全局地图对象
+        let map = null;
+        // 标记点和路线对象
+        let markers = [];
+        let polyline = null;
+
+        // 初始化城市标签和景点
+        function initializeAttractions() {
+            // 更新总景点数量
+            document.getElementById('totalAttractions').textContent = cityAttractions["全部"].length;
+
+            // 创建城市标签
+            const cityTabsContainer = document.getElementById('cityTabs');
+            Object.keys(cityAttractions).forEach(city => {
+                const tab = document.createElement('button');
+                tab.className = `px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    city === currentCity
+                        ? 'bg-primary text-white shadow-md'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`;
+                tab.textContent = city;
+                tab.onclick = () => switchCity(city, tab);
+                cityTabsContainer.appendChild(tab);
+            });
+
+            // 初始显示全部景点
+            renderAttractions(currentCity);
+
+            // 添加筛选功能
+            document.getElementById('attractionFilter').addEventListener('input', function(e) {
+                const filterText = e.target.value.toLowerCase();
+                const buttons = document.querySelectorAll('#attractionsGrid button');
+
+                buttons.forEach(button => {
+                    const text = button.textContent.toLowerCase();
+                    if (text.includes(filterText)) {
+                        button.style.display = '';
+                    } else {
+                        button.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // 切换城市
+        function switchCity(city, tab) {
+            // 更新标签状态
+            document.querySelectorAll('#cityTabs button').forEach(t => {
+                t.className = 'px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-gray-200 text-gray-700 hover:bg-gray-300';
+            });
+            tab.className = 'px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-primary text-white shadow-md';
+
+            // 更新当前城市并重新渲染景点
+            currentCity = city;
+            renderAttractions(city);
+
+            // 清除筛选文本
+            document.getElementById('attractionFilter').value = '';
+        }
+
+        // 渲染指定城市的景点
+        function renderAttractions(city) {
+            const grid = document.getElementById('attractionsGrid');
+            grid.innerHTML = ''; // 清空现有内容
+
+            cityAttractions[city].forEach(attraction => {
+                const button = document.createElement('button');
+                button.className = `px-2 py-2 text-sm rounded-md transition-all duration-200 transform hover:-translate-y-0.5 ${
+                    selectedAttractions.has(attraction)
+                        ? 'bg-danger text-white shadow-md hover:bg-red-600'
+                        : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`;
+                button.textContent = attraction;
+                button.title = attraction;
+                button.onclick = () => toggleAttraction(attraction, button);
+                // 双击查看详情
+                button.ondblclick = () => showAttractionDetail(attraction);
+                grid.appendChild(button);
+            });
+        }
+
+        // 切换景点选择
+        function toggleAttraction(attraction, button) {
+            if (selectedAttractions.has(attraction)) {
+                selectedAttractions.delete(attraction);
+                button.className = 'px-2 py-2 text-sm rounded-md transition-all duration-200 transform hover:-translate-y-0.5 bg-primary/10 text-primary hover:bg-primary/20';
+            } else {
+                selectedAttractions.add(attraction);
+                button.className = 'px-2 py-2 text-sm rounded-md transition-all duration-200 transform hover:-translate-y-0.5 bg-danger text-white shadow-md hover:bg-red-600';
+            }
+            updateSelectionCount();
+        }
+
+        // 更新选择计数
+        function updateSelectionCount() {
+            const count = selectedAttractions.size;
+            document.getElementById('selectedCount').textContent = count;
+            const calculateBtn = document.getElementById('calculateBtn');
+
+            if (count < 2) {
+                calculateBtn.disabled = true;
+                calculateBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                calculateBtn.classList.remove('hover:shadow-xl', 'hover:-translate-y-1');
+            } else {
+                calculateBtn.disabled = false;
+                calculateBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                calculateBtn.classList.add('hover:shadow-xl', 'hover:-translate-y-1');
+            }
+        }
+
+        // 重置选择
+        function resetSelection() {
+            selectedAttractions.clear();
+            renderAttractions(currentCity); // 重新渲染当前城市的景点以清除选中状态
+            updateSelectionCount();
+            clearResults();
+        }
+
+        // 清空结果显示
+        function clearResults() {
+            document.getElementById('pathDisplay').innerHTML =
+                '<p class="text-gray-500 italic">请选择景点并点击"开始路径规划"</p>';
+            document.getElementById('totalDistance').textContent = '--';
+            document.getElementById('totalTime').textContent = '--';
+            document.getElementById('placesCount').textContent = '--';
+            hideMessage('successMessage');
+            hideMessage('errorMessage');
+        }
+
+        // 显示消息
+        function showMessage(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        // 隐藏消息
+        function hideMessage(elementId) {
+            document.getElementById(elementId).classList.add('hidden');
+        }
+
+        // 规划路径
+        async function calculatePath() {
+            console.log('开始规划路径');
+            if (selectedAttractions.size < 2) {
+                showMessage('errorMessage', '请至少选择2个景点！');
+                return;
+            }
+
+            const algorithm = document.getElementById('algorithmSelect').value;
+            const selectedAttractionsArray = Array.from(selectedAttractions);
+
+            // 显示加载中
+            document.getElementById('loading').classList.remove('hidden');
+            hideMessage('errorMessage');
+            hideMessage('successMessage');
+
+            try {
+                const response = await fetch('/calculate-path', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        attractions: selectedAttractionsArray,
+                        algorithm: algorithm
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data);
+                    let algoName = '';
+                    switch(algorithm) {
+                        case 'greedy':
+                            algoName = '贪婪算法';
+                            break;
+                        case 'aco':
+                            algoName = 'ACO算法';
+                            break;
+                        case 'dp':
+                            algoName = '动态规划算法';
+                            break;
+                        case 'genetic':
+                            algoName = '遗传算法';
+                            break;
+                        default:
+                            algoName = '未知算法';
+                    }
+                    showMessage('successMessage', `路径规划成功！使用${algoName}`);
+                } else {
+                    showMessage('errorMessage', data.error || '路径规划失败，请重试！');
+                }
+            } catch (error) {
+                showMessage('errorMessage', '网络错误，请检查后端服务是否启动！');
+                console.error('Error:', error);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        // 初始化地图
+        function initMap() {
+            try {
+                // 初始中心点设为广州
+                map = new AMap.Map("mapContainer", {
+                    zoom: 10,
+                    center: [113.27, 23.13] // 广州经纬度
+                });
+
+                // 检查并添加地图控件，避免控件不存在导致的错误
+                if (typeof AMap.ToolBar === 'function') {
+                    map.addControl(new AMap.ToolBar());
+                } else {
+                    console.warn('AMap.ToolBar控件不可用，已跳过');
+                }
+
+                if (typeof AMap.Scale === 'function') {
+                    map.addControl(new AMap.Scale());
+                } else {
+                    console.warn('AMap.Scale控件不可用，已跳过');
+                }
+
+                if (typeof AMap.MapType === 'function') {
+                    map.addControl(new AMap.MapType());
+                } else {
+                    console.warn('AMap.MapType控件不可用，已跳过');
+                }
+
+                console.log('地图初始化成功');
+            } catch (error) {
+                console.error('地图初始化失败:', error);
+                showMessage('errorMessage', '地图加载失败: ' + error.message);
+            }
+
+            // 调整地图高度
+            adjustMapHeight();
+        }
+
+        // 根据景点名称获取经纬度
+        async function getLocation(placeName) {
+            if (attractionCoordinates[placeName]) {
+                return {
+                    ...attractionCoordinates[placeName],
+                    name: placeName
+                };
+            }
+            // 这里使用高德地图的POI搜索API获取坐标
+            return new Promise((resolve) => {
+                AMap.plugin('AMap.PlaceSearch', function() {
+                    const placeSearch = new AMap.PlaceSearch({
+                        city: '全国', // 搜索范围
+                        pageSize: 1
+                    });
+
+                    placeSearch.search(placeName, function(status, result) {
+                        if (status === 'complete' && result.poiList.pois.length > 0) {
+                            const location = result.poiList.pois[0].location;
+                            resolve({
+                                lng: location.lng,
+                                lat: location.lat,
+                                name: placeName
+                            });
+                        } else {
+                            console.warn(`未找到 ${placeName} 的位置`);
+                            resolve(null);
+                        }
+                    });
+                });
+            });
+        }
+
+        // 清除现有标记和路线
+        function clearMap() {
+            // 清除标记
+            markers.forEach(marker => map.remove(marker));
+            markers = [];
+
+            // 清除路线
+            if (polyline) {
+                map.remove(polyline);
+                polyline = null;
+            }
+        }
+
+        // 在地图上绘制路径
+        async function drawPathOnMap(path) {
+            // 清除现有内容
+            clearMap();
+
+            if (!map) {
+                initMap();
+            }
+
+            // 获取所有景点的坐标
+            const locations = [];
+            for (const place of path) {
+                const loc = await getLocation(place);
+                if (loc) {
+                    locations.push(loc);
+                }
+            }
+
+            if (locations.length < 2) {
+                alert("无法绘制路径：至少需要2个有效的景点位置");
+                return;
+            }
+
+            // 添加标记点
+            locations.forEach((loc, index) => {
+                const marker = new AMap.Marker({
+                    position: [loc.lng, loc.lat],
+                    title: loc.name,
+                    label: {
+                        content: `${index + 1}`,
+                        offset: new AMap.Pixel(-5, -20)
+                    }
+                });
+                marker.setMap(map);
+                markers.push(marker);
+
+                // 点击标记显示详情
+                marker.on('click', function() {
+                    showAttractionDetail(loc.name);
+                });
+            });
+
+
+            // 绘制路线
+            const pathCoordinates = locations.map(loc => [loc.lng, loc.lat]);
+            polyline = new AMap.Polyline({
+                path: pathCoordinates,
+                strokeColor: "#3B82F6", // 线颜色
+                strokeWeight: 5,       // 线宽
+                strokeOpacity: 0.8     // 透明度
+            });
+            polyline.setMap(map);
+
+            // 调整地图视野以显示所有标记
+            map.setFitView(markers);
+        }
+
+        // 显示规划结果
+        function displayResults(data) {
+            const pathDisplay = document.getElementById('pathDisplay');
+            const path = data.path_names;
+
+            // 显示路径文本
+            let pathHTML = '';
+            path.forEach((place, index) => {
+                let flag = '';
+                if (cityAttractions["香港"].includes(place)) {
+                    flag = '<span class="ml-1 text-xs inline-block px-1 bg-red-500 text-white rounded">港</span>';
+                } else if (cityAttractions["澳门"].includes(place)) {
+                    flag = '<span class="ml-1 text-xs inline-block px-1 bg-green-500 text-white rounded">澳</span>';
+                }
+
+                pathHTML += `<div class="bg-primary text-white px-3 py-1.5 rounded-full m-1 text-sm flex items-center cursor-pointer hover:bg-primary/80" onclick="showAttractionDetail('${place}')">
+                                ${place}${flag}
+                            </div>`;
+                if (index < path.length - 1) {
+                    pathHTML += '<i class="fa fa-long-arrow-right text-gray-400 my-2"></i>';
+                }
+            });
+            pathDisplay.innerHTML = pathHTML;
+
+            // 显示统计信息
+            document.getElementById('totalDistance').textContent =
+                `${(data.total_distance)} km`;
+
+            // 处理时间显示
+            const totalMinutes = Math.round(data.total_time);
+            let timeDisplay;
+            if (totalMinutes >= 60) {
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                timeDisplay = minutes > 0
+                    ? `${hours}小时${minutes}分钟`
+                    : `${hours}小时`;
+            } else {
+                timeDisplay = `${totalMinutes}分钟`;
+            }
+            document.getElementById('totalTime').textContent = timeDisplay;
+
+            document.getElementById('placesCount').textContent =
+                `${data.places_visited} 个`;
+
+            // 在地图上绘制路径
+            drawPathOnMap(path);
+        }
+
+        // 显示景点详情
+        function showAttractionDetail(attraction) {
+            const modal = document.getElementById('attractionModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = attraction;
+
+            // 检查是否有该景点的详细信息
+            let detail = attractionDetails[attraction];
+            if (!detail) {
+                detail = `暂无${attraction}的详细信息，敬请期待。`;
+            }
+
+            // 添加景点位置信息
+            const coords = attractionCoordinates[attraction];
+            if (coords) {
+                detail += `<div class="mt-3 text-sm text-gray-600">
+                            <p><i class="fa fa-map-marker text-primary mr-1"></i>经纬度: ${coords.lng.toFixed(6)}, ${coords.lat.toFixed(6)}</p>
+                          </div>`;
+            }
+
+            modalContent.innerHTML = `<p class="mb-3">${detail}</p>`;
+            modal.classList.remove('hidden');
+        }
+
+        // 关闭景点详情弹窗
+        function closeAttractionModal() {
+            document.getElementById('attractionModal').classList.add('hidden');
+        }
+
+        // 根据屏幕尺寸调整地图高度
+        function adjustMapHeight() {
+            const windowHeight = window.innerHeight;
+            const mapContainer = document.getElementById('mapContainer');
+
+            if (window.innerWidth < 768) { // 移动端
+                mapContainer.style.height = `${windowHeight * 0.5}px`;
+            } else {
+                mapContainer.style.height = '400px';
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 先初始化景点数据
+            initializeAttractions();
+
+            // 检查地图API是否加载成功
+            if (typeof AMap === 'undefined') {
+                console.error('高德地图API未加载，请检查引入是否正确');
+                showMessage('errorMessage', '地图加载失败，请刷新页面重试');
+            } else {
+                // 延迟初始化地图，确保API完全加载
+                setTimeout(initMap, 500);
+            }
+
+            // 获取按钮元素并添加日志，确保元素存在
+            const calculateBtn = document.getElementById('calculateBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const savePathBtn = document.getElementById('savePathBtn');
+            const sharePathBtn = document.getElementById('sharePathBtn');
+            const closeModalBtn = document.getElementById('closeModal');
+
+            if (!calculateBtn || !resetBtn) {
+                console.error('未找到计算按钮或重置按钮元素');
+                return;
+            }
+
+            // 为计算按钮添加点击事件，带日志输出
+            calculateBtn.addEventListener('click', function() {
+                console.log('计算按钮被点击');
+                calculatePath();
+            });
+
+            // 为重置按钮添加点击事件
+            resetBtn.addEventListener('click', function() {
+                console.log('重置按钮被点击');
+                resetSelection();
+                clearMap(); // 重置时清除地图
+            });
+
+            // 保存路径功能
+            savePathBtn.addEventListener('click', function() {
+                const pathData = {
+                    name: `旅游路径_${new Date().toLocaleDateString()}`,
+                    attractions: Array.from(selectedAttractions),
+                    timestamp: new Date().getTime()
+                };
+
+                const savedPaths = JSON.parse(localStorage.getItem('savedPaths') || '[]');
+                savedPaths.push(pathData);
+                localStorage.setItem('savedPaths', JSON.stringify(savedPaths));
+
+                showMessage('successMessage', '路径已保存！');
+            });
+
+            // 分享路径功能
+            sharePathBtn.addEventListener('click', function() {
+                if (selectedAttractions.size < 2) {
+                    showMessage('errorMessage', '请先选择景点并完成路径规划');
+                    return;
+                }
+
+                const pathStr = Array.from(selectedAttractions).join(',');
+                const shareText = `我在粤港澳大湾区旅游路径规划系统中规划了一条路线：${pathStr}`;
+
+                if (navigator.share) {
+                    navigator.share({
+                        title: '粤港澳大湾区旅游路径',
+                        text: shareText
+                    }).catch(err => {
+                        console.log('分享失败:', err);
+                        // 分享失败时回退到复制到剪贴板
+                        navigator.clipboard.writeText(shareText)
+                            .then(() => showMessage('successMessage', '路径已复制到剪贴板！'));
+                    });
+                } else {
+                    // 复制到剪贴板
+                    navigator.clipboard.writeText(shareText)
+                        .then(() => showMessage('successMessage', '路径已复制到剪贴板！'));
+                }
+            });
+
+            // 关闭弹窗按钮事件
+            closeModalBtn.addEventListener('click', closeAttractionModal);
+
+            // 点击弹窗外部关闭弹窗
+            document.getElementById('attractionModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeAttractionModal();
+                }
+            });
+
+            // 监听窗口大小变化，调整地图高度
+            window.addEventListener('resize', adjustMapHeight);
+
+            // 额外添加按钮状态检查
+            setInterval(() => {
+                const isDisabled = calculateBtn.disabled;
+                console.log(`计算按钮状态: ${isDisabled ? '禁用' : '可用'}`);
+                console.log(`已选择景点数量: ${selectedAttractions.size}`);
+            }, 3000);
+        });
+
+        // 全局函数，用于路径中的景点点击显示详情
+        window.showAttractionDetail = showAttractionDetail;
+
+    </script>
+</body>
+</html>

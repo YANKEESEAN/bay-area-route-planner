@@ -1,4 +1,3 @@
-````markdown
 # bay-area-route-planner
 
 An intelligent tourism route planning system for the Guangdong–Hong Kong–Macao Greater Bay Area (GBA).
@@ -61,7 +60,6 @@ bay-area-route-planner/
 ├── locations.py            # Attraction information
 │
 └── README.md
-````
 
 ---
 
@@ -148,9 +146,6 @@ MIT License
 
 ---
 
-# README.md（中文版）
-
-```markdown
 # 粤港澳大湾区智游路径优化系统
 
 基于多启发式算法的旅游路径规划引擎。
@@ -219,7 +214,6 @@ Smart-GBA-Trip-Planner/
 ├── locations.py            # 景点数据管理
 │
 └── README.md
-````
 
 ---
 

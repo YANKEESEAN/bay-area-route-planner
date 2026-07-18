@@ -48,6 +48,7 @@ The project uses Flask as the backend service and AMap API for route visualizati
 
 ## Project Structure
 
+```text
 bay-area-route-planner/
 │
 ├── templates/
@@ -59,6 +60,7 @@ bay-area-route-planner/
 ├── locations.py            # Attraction information
 │
 └── README.md
+```
 
 ---
 
@@ -200,6 +202,7 @@ MIT License
 
 ## 项目结构
 
+```text
 Smart-GBA-Trip-Planner/
 │
 ├── templates/
@@ -211,6 +214,7 @@ Smart-GBA-Trip-Planner/
 ├── locations.py            # 景点数据管理
 │
 └── README.md
+```
 
 ---
 

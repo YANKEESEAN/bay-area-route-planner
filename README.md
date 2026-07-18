@@ -19,7 +19,7 @@ The project integrates multiple path optimization algorithms, including Greedy A
 - Route sharing support
 - Greater Bay Area tourism attraction database
 
-The system is designed to solve the route optimization problem for multi-destination tourism scenarios in the Greater Bay Area. :contentReference[oaicite:0]{index=0}
+The system is designed to solve the route optimization problem for multi-destination tourism scenarios in the Greater Bay Area.
 
 ---
 
@@ -42,7 +42,7 @@ The system is designed to solve the route optimization problem for multi-destina
 - Pandas
 - NumPy
 
-The project uses Flask as the backend service and AMap API for route visualization. :contentReference[oaicite:1]{index=1}
+The project uses Flask as the backend service and AMap API for route visualization.
 
 ---
 
@@ -91,8 +91,8 @@ The system allows users to choose different algorithms according to route scale 
 ### Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Smart-GBA-Trip-Planner.git
-cd Smart-GBA-Trip-Planner
+git clone https://github.com/YOUR_USERNAME/bay-area-route-planner.git
+cd bay-area-route-planner
 ```
 
 ### Install Dependencies
@@ -158,7 +158,7 @@ MIT License
 
 粤港澳大湾区拥有丰富的旅游资源和复杂的跨城市交通网络。
 
-针对传统旅游规划中存在的路线绕行、耗时过长以及决策效率低等问题，本系统通过路径优化算法自动生成高效旅游路线，帮助用户快速完成行程规划。 :contentReference[oaicite:4]{index=4}
+针对传统旅游规划中存在的路线绕行、耗时过长以及决策效率低等问题，本系统通过路径优化算法自动生成高效旅游路线，帮助用户快速完成行程规划。
 
 ---
 
@@ -196,14 +196,14 @@ MIT License
 - Pandas
 - NumPy
 
-系统采用 Flask 构建后端服务，并结合高德地图实现路线可视化。 :contentReference[oaicite:5]{index=5}
+系统采用 Flask 构建后端服务，并结合高德地图实现路线可视化。
 
 ---
 
 ## 项目结构
 
 ```text
-Smart-GBA-Trip-Planner/
+bay-area-route-planner/
 │
 ├── templates/
 │   └── index.html          # 前端页面
